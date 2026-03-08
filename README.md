@@ -3,6 +3,11 @@ trickster.music is an ad-free premium grade music app like YouTube Music and Spo
 
 With trickster's premium design and features (and high-quality audio library)  you are sure to love it.
 
+# About trickster.music.library
+trickster.music.library is extra songs, albums, playlists and more for the music app you already love!
+
+this repo also hosts the "mirror" link for trickster.music in case the main one goes down or fails.
+
 ## Music Content
 From J-Pop to Electronic to Rock n' Roll we got you covered with hundreds of tracks in one amazing light and fast app.
 
