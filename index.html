@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Trickster Music</title>
+    
+    <!-- PWA Metadata -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Trickster">
+    <meta name="theme-color" content="#030303">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        yt: {
+                            bg: '#030303',
+                            surface: '#181818',
+                            surfaceHover: '#282828',
+                            accent: '#ff0033', 
+                            text: '#ffffff',
+                            textMuted: '#aaaaaa'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'Roboto', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <style>
+        body {
+            background-color: #030303;
+            color: #ffffff;
+            font-family: 'Inter', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+            overflow: hidden;
+            /* Safe area insets for mobile notches */
+            padding-top: env(safe-area-inset-top);
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+        
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #030303; }
+        ::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 20px; border: 2px solid #030303; }
+        ::-webkit-scrollbar-thumb:hover { background: #ff0033; }
+
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        .album-art-container .play-overlay {
+            opacity: 0;
+            transition: all 0.2s ease-in-out;
+        }
+        .album-art-container:hover .play-overlay {
+            opacity: 1;
+            background: rgba(0, 0, 0, 0.5);
+        }
+
+        .glass-nav {
+            background: rgba(3, 3, 3, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+
+        .page-transition {
+            transition: opacity 0.5s ease, transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        #main-scroll-area {
+            height: calc(100vh - 72px - 90px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+            overflow-y: auto;
+            overflow-x: hidden;
+        }
+
+        .spinner {
+            border: 3px solid rgba(255, 255, 255, 0.1);
+            border-top: 3px solid #ff0033;
+            border-radius: 50%;
+            width: 24px; height: 24px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            background: rgba(255, 255, 255, 0.2);
+            height: 4px;
+            border-radius: 2px;
+            cursor: pointer;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 12px; width: 12px;
+            border-radius: 50%;
+            background: #ff0033;
+            cursor: pointer;
+        }
+
+        #progress-container { height: 4px; transition: height 0.2s; }
+        #progress-container:hover { height: 6px; }
+
+        .tab-btn {
+            position: relative;
+            padding: 8px 16px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #aaaaaa;
+            transition: all 0.2s;
+        }
+        .tab-btn.active { color: #ffffff; background: rgba(255, 255, 255, 0.1); border-radius: 8px; }
+        .tab-btn.active::after {
+            content: '';
+            position: absolute; bottom: -14px; left: 50%; transform: translateX(-50%);
+            width: 20px; height: 3px; background: #ff0033; border-radius: 2px;
+        }
+
+        /* Mobile Player Animations */
+        #mobile-fs-player {
+            will-change: transform;
+            transition: transform 0.4s cubic-bezier(0.32, 0.72, 0, 1);
+        }
+
+        @media (max-width: 768px) {
+            #player-controls-center { width: 40%; }
+            #player-info-left { width: 60%; }
+            #player-volume-right { display: none; }
+        }
+    </style>
+</head>
+<body class="antialiased h-screen w-full flex flex-col selection:bg-yt-accent selection:text-white">
+
+    <!-- LOGIN SCREEN -->
+    <div id="login-screen" class="absolute inset-0 z-50 flex items-center justify-center bg-yt-bg page-transition">
+        <div class="w-full max-w-md p-8 bg-yt-surface rounded-2xl shadow-2xl border border-white/5 flex flex-col items-center">
+            <div class="w-20 h-20 bg-gradient-to-br from-yt-accent to-purple-600 rounded-full flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(255,0,51,0.3)]">
+                <i class="ph-fill ph-mask-happy text-4xl text-white"></i>
+            </div>
+            <h1 class="text-3xl font-bold tracking-tight mb-2">Trickster Music</h1>
+            <p class="text-yt-textMuted mb-8 text-center">Connected to TruStore DB</p>
+
+            <form id="login-form" class="w-full space-y-4">
+                <input type="text" id="access-id" placeholder="Access ID" class="w-full bg-[#0f0f0f] border border-white/10 text-white rounded-xl py-3 px-4 focus:outline-none focus:border-yt-accent" value="trickster_vip">
+                <input type="password" id="passcode" placeholder="Passcode" class="w-full bg-[#0f0f0f] border border-white/10 text-white rounded-xl py-3 px-4 focus:outline-none focus:border-yt-accent" value="••••••••">
+                <button type="submit" class="w-full bg-yt-accent hover:bg-red-600 text-white font-semibold rounded-xl py-3.5 flex justify-center items-center gap-2 transition-all active:scale-95">
+                    <span>Unlock Library</span>
+                    <i class="ph-bold ph-arrow-right"></i>
+                </button>
+            </form>
+            <button type="button" id="guest-btn" class="mt-6 text-sm text-yt-textMuted hover:text-white transition-colors">Use as a guest</button>
+        </div>
+    </div>
+
+    <!-- MAIN APP -->
+    <div id="main-app" class="hidden flex-col h-full w-full opacity-0 page-transition translate-y-4">
+        <nav class="glass-nav h-[72px] sticky top-0 z-30 w-full px-4 md:px-8 py-4 flex items-center justify-between border-b border-white/5">
+            <div class="flex items-center gap-8">
+                <div class="flex items-center gap-3">
+                    <i class="ph-fill ph-mask-happy text-3xl text-yt-accent"></i>
+                    <span class="text-xl font-bold tracking-tight hidden sm:block">Trickster</span>
+                </div>
+                <!-- Desktop Navigation Tabs -->
+                <div class="hidden lg:flex items-center gap-2">
+                    <button class="tab-btn active" onclick="switchTab('home')">Home</button>
+                    <button class="tab-btn" onclick="switchTab('explore')">Explore</button>
+                    <button class="tab-btn" onclick="switchTab('albums')">Albums</button>
+                    <button class="tab-btn" onclick="switchTab('playlists')">Playlists</button>
+                    <button class="tab-btn" onclick="switchTab('liked')">Liked Songs</button>
+                </div>
+            </div>
+            
+            <div class="flex-1 max-w-md mx-4 hidden md:flex items-center bg-white/10 rounded-full px-4 py-2 ml-auto">
+                <i class="ph ph-magnifying-glass text-yt-textMuted mr-2"></i>
+                <input type="text" placeholder="Search..." class="bg-transparent border-none outline-none w-full text-sm text-white">
+            </div>
+
+            <!-- Mobile Menu Toggle -->
+            <div class="lg:hidden flex gap-5">
+                <button onclick="switchTab('home')" class="mobile-nav-btn text-yt-accent" id="mob-home"><i class="ph-fill ph-house text-2xl"></i></button>
+                <button onclick="switchTab('explore')" class="mobile-nav-btn text-yt-textMuted" id="mob-explore"><i class="ph ph-compass text-2xl"></i></button>
+                <button onclick="switchTab('albums')" class="mobile-nav-btn text-yt-textMuted" id="mob-albums"><i class="ph ph-vinyl-record text-2xl"></i></button>
+                <button onclick="switchTab('playlists')" class="mobile-nav-btn text-yt-textMuted" id="mob-playlists"><i class="ph ph-list-bullets text-2xl"></i></button>
+            </div>
+        </nav>
+
+        <div id="main-scroll-area">
+            <main class="pt-6 px-4 md:px-8 pb-10" id="library-content">
+                <div id="global-loader" class="flex flex-col items-center justify-center py-20 gap-4">
+                    <div class="spinner"></div>
+                    <p class="text-yt-textMuted animate-pulse">Syncing tracks from GitHub DB...</p>
+                </div>
+            </main>
+        </div>
+
+        <!-- PLAYER BOTTOM BAR -->
+        <div class="h-[90px] fixed bottom-0 left-0 w-full bg-[#0a0a0a] border-t border-white/10 z-40 px-4 py-3 flex items-center justify-between pb-[env(safe-area-inset-bottom)]">
+            <!-- Skim Bar -->
+            <div class="absolute top-0 left-0 w-full bg-white/10 group cursor-pointer" id="progress-container">
+                <div id="player-progress" class="h-full bg-yt-accent w-0 relative">
+                    <div class="absolute right-0 top-1/2 -translate-y-1/2 w-4 h-4 bg-white rounded-full scale-0 group-hover:scale-100 transition-transform shadow-lg"></div>
+                </div>
+            </div>
+
+            <!-- Left: Info & Actions -->
+            <div id="player-info-left" class="flex items-center gap-3 w-1/2 md:w-1/3 truncate cursor-pointer md:cursor-default" onclick="if(window.innerWidth < 768) openFSPlayer()">
+                <div class="w-12 h-12 rounded bg-yt-surface flex-shrink-0 flex items-center justify-center overflow-hidden">
+                    <img id="player-art" src="" class="w-full h-full object-cover hidden">
+                    <i id="player-placeholder" class="ph ph-music-notes text-2xl text-yt-textMuted"></i>
+                </div>
+                <div class="flex flex-col justify-center min-w-0 pr-2">
+                    <h4 id="player-title" class="text-sm font-semibold truncate">Not Playing</h4>
+                    <p id="player-artist" class="text-xs text-yt-textMuted truncate">Select a track</p>
+                </div>
+                <div class="hidden md:flex items-center gap-2 flex-shrink-0 ml-2">
+                    <button id="btn-like" class="text-yt-textMuted hover:text-white transition"><i class="ph ph-thumbs-up text-xl"></i></button>
+                    <button id="btn-dislike" class="text-yt-textMuted hover:text-white transition"><i class="ph ph-thumbs-down text-xl"></i></button>
+                </div>
+            </div>
+
+            <!-- Center: Playback Controls -->
+            <div id="player-controls-center" class="flex items-center justify-end md:justify-center w-1/2 md:w-1/3 gap-4 md:gap-6 pr-2 md:pr-0">
+                <button id="btn-prev" class="text-yt-textMuted hover:text-white transition active:scale-90 hidden md:block"><i class="ph-fill ph-skip-back text-xl md:text-2xl"></i></button>
+                <button id="play-pause-btn" class="w-10 h-10 md:w-12 md:h-12 bg-white text-black rounded-full flex items-center justify-center hover:scale-105 active:scale-95 transition">
+                    <i id="play-icon" class="ph-fill ph-play text-xl md:text-2xl"></i>
+                </button>
+                <button id="btn-next" class="text-yt-textMuted hover:text-white transition active:scale-90"><i class="ph-fill ph-skip-forward text-xl md:text-2xl"></i></button>
+            </div>
+
+            <!-- Right: Time, Repeat, Volume -->
+            <div id="player-volume-right" class="w-1/3 flex justify-end items-center gap-3 lg:gap-5 text-yt-textMuted pr-2">
+                <!-- Time Block -->
+                <div class="hidden md:flex items-center text-xs font-medium text-yt-textMuted tabular-nums">
+                    <span id="time-current">0:00</span>
+                    <span class="mx-1 opacity-40">/</span>
+                    <span id="time-total">0:00</span>
+                </div>
+                <!-- Repeat Block -->
+                <button id="btn-repeat" class="text-yt-textMuted hover:text-white transition flex-shrink-0 ml-2" onclick="toggleRepeat()">
+                    <i class="ph ph-repeat text-xl md:text-2xl" id="repeat-icon"></i>
+                </button>
+                <!-- Volume Block -->
+                <div class="flex items-center gap-2 flex-shrink-0">
+                    <i class="ph ph-speaker-high text-xl" id="vol-icon"></i>
+                    <div class="w-20 lg:w-28 flex items-center">
+                        <input type="range" id="volume-slider" min="0" max="1" step="0.01" value="1" class="w-full accent-yt-accent">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MOBILE FULL SCREEN PLAYER OVERLAY -->
+    <div id="mobile-fs-player" class="fixed inset-0 z-50 bg-[#030303] flex flex-col translate-y-full md:hidden touch-none" style="padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom);">
+        <!-- Drag Handle / Header -->
+        <div class="px-6 py-4 flex justify-between items-center bg-gradient-to-b from-black/50 to-transparent">
+            <button onclick="closeFSPlayer()" class="p-2 -ml-2"><i class="ph ph-caret-down text-2xl text-white"></i></button>
+            <span class="text-xs font-bold tracking-widest text-yt-textMuted uppercase">Now Playing</span>
+            <button class="p-2 -mr-2"><i class="ph ph-dots-three-vertical text-2xl text-white"></i></button>
+        </div>
+        
+        <!-- Album Art -->
+        <div class="flex-1 flex items-center justify-center p-8">
+            <div class="w-full max-w-[320px] aspect-square rounded-[2rem] overflow-hidden shadow-2xl bg-yt-surface">
+                <img id="fs-art" class="w-full h-full object-cover hidden">
+                <i id="fs-placeholder" class="ph ph-music-notes text-6xl text-yt-textMuted flex items-center justify-center h-full"></i>
+            </div>
+        </div>
+        
+        <!-- Controls & Info Area -->
+        <div class="px-8 pb-10">
+            <!-- Titles & Actions -->
+            <div class="flex justify-between items-center mb-8">
+                <div class="truncate pr-4 flex-1">
+                    <h2 id="fs-title" class="text-2xl font-bold text-white truncate mb-1">Not Playing</h2>
+                    <p id="fs-artist" class="text-yt-textMuted text-lg truncate">Select a track</p>
+                </div>
+                <div class="flex gap-4">
+                    <button id="fs-btn-like" class="text-yt-textMuted hover:text-white transition"><i class="ph ph-thumbs-up text-2xl"></i></button>
+                    <button id="fs-btn-dislike" class="text-yt-textMuted hover:text-white transition"><i class="ph ph-thumbs-down text-2xl"></i></button>
+                </div>
+            </div>
+            
+            <!-- Progress -->
+            <div class="mb-8 relative group cursor-pointer" id="fs-progress-container">
+                <div class="h-1.5 bg-white/20 rounded-full w-full overflow-hidden">
+                    <div id="fs-progress" class="h-full bg-yt-accent w-0 relative rounded-full"></div>
+                </div>
+                <div class="flex justify-between text-xs text-yt-textMuted mt-3 font-medium">
+                    <span id="fs-time-current">0:00</span>
+                    <span id="fs-time-total">0:00</span>
+                </div>
+            </div>
+            
+            <!-- Main Controls -->
+            <div class="flex justify-between items-center px-2">
+                <button class="text-yt-textMuted hover:text-white transition"><i class="ph ph-shuffle text-2xl"></i></button>
+                <button id="fs-btn-prev" class="text-white active:scale-90 transition"><i class="ph-fill ph-skip-back text-4xl"></i></button>
+                <button id="fs-btn-play" class="w-[72px] h-[72px] bg-white text-black rounded-full flex items-center justify-center hover:scale-105 active:scale-95 transition shadow-[0_0_20px_rgba(255,255,255,0.2)]">
+                    <i id="fs-play-icon" class="ph-fill ph-play text-4xl ml-1"></i>
+                </button>
+                <button id="fs-btn-next" class="text-white active:scale-90 transition"><i class="ph-fill ph-skip-forward text-4xl"></i></button>
+                <button id="fs-btn-repeat" class="text-yt-textMuted transition" onclick="toggleRepeat()"><i class="ph ph-repeat text-2xl" id="fs-repeat-icon"></i></button>
+            </div>
+        </div>
+    </div>
+
+    <audio id="audio-engine"></audio>
+
+    <script>
+        // PWA Service Worker Registration
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                const swCode = `
+                    const CACHE_NAME = 'trickster-cache-v1';
+                    self.addEventListener('install', (event) => { event.waitUntil(caches.open(CACHE_NAME)); });
+                    self.addEventListener('fetch', (event) => {
+                        event.respondWith(caches.match(event.request).then((response) => response || fetch(event.request)));
+                    });
+                `;
+                const blob = new Blob([swCode], { type: 'application/javascript' });
+                const swUrl = URL.createObjectURL(blob);
+                navigator.serviceWorker.register(swUrl).catch(err => console.log('SW failed', err));
+            });
+        }
+
+        const REPO_OWNER = 'TruStoreOfficial';
+        const REPO_NAME = 'trickster.music';
+        const BASE_PATH = 'localhost';
+        const PLAYLIST_BASE = 'RenderX';
+        const ALBUM_BASE = 'AlbumX Loader';
+        const CATEGORIES = ['Phonk', 'J-Pop', 'Electronic', 'Memes', 'Pop', 'Rap', 'Rock'];
+
+        let elements = {};
+        let library = {}; 
+        let allSongs = []; 
+        let currentPlaylist = [];
+        let currentIndex = -1;
+        let isPlaying = false;
+        let isDraggingProgress = false;
+        let activeTab = 'home';
+        let repeatState = 0; // 0: None, 1: All, 2: One
+
+        const GENRE_COVERS = {
+            'J-Pop': 'https://images.unsplash.com/photo-1526218626217-dc65a29bb444?auto=format&fit=crop&w=300&q=80',
+            'Electronic': 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&w=300&q=80',
+            'Memes': 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=300&q=80',
+            'Pop': 'https://images.unsplash.com/photo-1493225255756-d9584f8606e9?auto=format&fit=crop&w=300&q=80',
+            'Rap': 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?auto=format&fit=crop&w=300&q=80',
+            'Rock': 'https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?auto=format&fit=crop&w=300&q=80',
+            'Phonk': 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?auto=format&fit=crop&w=300&q=80'
+        };
+
+        const setCookie = (name, value) => { document.cookie = `${name}=${JSON.stringify(value)};path=/;max-age=31536000`; };
+        const getCookie = (name) => {
+            const val = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+            return val ? JSON.parse(val.pop()) : null;
+        };
+
+        let userLikes = getCookie('trickster_likes') || { liked: [], disliked: [] };
+
+        window.addEventListener('DOMContentLoaded', () => {
+            elements = {
+                loginScreen: document.getElementById('login-screen'),
+                loginForm: document.getElementById('login-form'),
+                guestBtn: document.getElementById('guest-btn'),
+                mainApp: document.getElementById('main-app'),
+                libraryContent: document.getElementById('library-content'),
+                audio: document.getElementById('audio-engine'),
+                playerTitle: document.getElementById('player-title'),
+                playerArtist: document.getElementById('player-artist'),
+                playerArt: document.getElementById('player-art'),
+                playerPlaceholder: document.getElementById('player-placeholder'),
+                playPauseBtn: document.getElementById('play-pause-btn'),
+                playIcon: document.getElementById('play-icon'),
+                progressBar: document.getElementById('player-progress'),
+                progressContainer: document.getElementById('progress-container'),
+                timeCurrent: document.getElementById('time-current'),
+                timeTotal: document.getElementById('time-total'),
+                volumeSlider: document.getElementById('volume-slider'),
+                btnLike: document.getElementById('btn-like'),
+                btnDislike: document.getElementById('btn-dislike'),
+                btnNext: document.getElementById('btn-next'),
+                btnPrev: document.getElementById('btn-prev')
+            };
+
+            elements.loginForm.onsubmit = (e) => { e.preventDefault(); enterApp(); };
+            elements.guestBtn.onclick = enterApp;
+            
+            // Sync controls for normal and FS player
+            [elements.playPauseBtn, document.getElementById('fs-btn-play')].forEach(btn => btn.onclick = togglePlay);
+            [elements.btnNext, document.getElementById('fs-btn-next')].forEach(btn => btn.onclick = playNext);
+            [elements.btnPrev, document.getElementById('fs-btn-prev')].forEach(btn => btn.onclick = playPrev);
+
+            // Progress Bar Inputs
+            const setupProgressHandling = (containerId) => {
+                const container = document.getElementById(containerId);
+                const handleInput = (clientX) => {
+                    if (!elements.audio.duration) return;
+                    const rect = container.getBoundingClientRect();
+                    const pos = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+                    elements.audio.currentTime = pos * elements.audio.duration;
+                    const percent = `${pos * 100}%`;
+                    elements.progressBar.style.width = percent;
+                    document.getElementById('fs-progress').style.width = percent;
+                    elements.timeCurrent.textContent = formatTime(elements.audio.currentTime);
+                    document.getElementById('fs-time-current').textContent = formatTime(elements.audio.currentTime);
+                };
+
+                container.addEventListener('mousedown', (e) => {
+                    isDraggingProgress = true;
+                    handleInput(e.clientX);
+                });
+                container.addEventListener('touchstart', (e) => {
+                    isDraggingProgress = true;
+                    handleInput(e.touches[0].clientX);
+                }, {passive: true});
+                
+                return handleInput;
+            };
+
+            const handleMainProgress = setupProgressHandling('progress-container');
+            const handleFSProgress = setupProgressHandling('fs-progress-container');
+
+            window.addEventListener('mousemove', (e) => {
+                if (isDraggingProgress) {
+                    const activePlayerFS = !document.getElementById('mobile-fs-player').classList.contains('translate-y-full');
+                    if(activePlayerFS) handleFSProgress(e.clientX);
+                    else handleMainProgress(e.clientX);
+                }
+            });
+            window.addEventListener('touchmove', (e) => {
+                if (isDraggingProgress) {
+                    const activePlayerFS = !document.getElementById('mobile-fs-player').classList.contains('translate-y-full');
+                    if(activePlayerFS) handleFSProgress(e.touches[0].clientX);
+                    else handleMainProgress(e.touches[0].clientX);
+                }
+            }, {passive: true});
+
+            window.addEventListener('mouseup', () => isDraggingProgress = false);
+            window.addEventListener('touchend', () => isDraggingProgress = false);
+
+            // Volume setup
+            elements.volumeSlider.oninput = (e) => {
+                const vol = e.target.value;
+                elements.audio.volume = vol;
+                const icon = document.getElementById('vol-icon');
+                if (vol == 0) icon.className = "ph ph-speaker-slash text-xl";
+                else if (vol < 0.5) icon.className = "ph ph-speaker-low text-xl";
+                else icon.className = "ph ph-speaker-high text-xl";
+            };
+
+            // Likes setup
+            if (elements.btnLike) elements.btnLike.onclick = () => handleVote('like');
+            if (elements.btnDislike) elements.btnDislike.onclick = () => handleVote('dislike');
+            document.getElementById('fs-btn-like').onclick = () => handleVote('like');
+            document.getElementById('fs-btn-dislike').onclick = () => handleVote('dislike');
+
+            if (elements.audio) {
+                elements.audio.ontimeupdate = () => {
+                    if (elements.audio.duration && !isDraggingProgress) {
+                        const percent = (elements.audio.currentTime / elements.audio.duration) * 100;
+                        elements.progressBar.style.width = `${percent}%`;
+                        document.getElementById('fs-progress').style.width = `${percent}%`;
+                        
+                        const curTime = formatTime(elements.audio.currentTime);
+                        const totTime = formatTime(elements.audio.duration);
+                        
+                        elements.timeCurrent.textContent = curTime;
+                        elements.timeTotal.textContent = totTime;
+                        document.getElementById('fs-time-current').textContent = curTime;
+                        document.getElementById('fs-time-total').textContent = totTime;
+                    }
+                };
+                
+                elements.audio.onended = () => {
+                    if (repeatState === 2) {
+                        // Repeat One
+                        elements.audio.currentTime = 0;
+                        elements.audio.play().catch(e => console.error(e));
+                    } else if (currentPlaylist.length > 0 && currentIndex < currentPlaylist.length - 1) {
+                        playNext();
+                    } else if (repeatState === 1 && currentPlaylist.length > 0) {
+                        // Repeat All
+                        currentIndex = 0;
+                        playTrack(currentPlaylist[0]);
+                    }
+                };
+            }
+
+            // Mobile FS Player swipe to dismiss logic
+            let startY = 0;
+            const fsPlayer = document.getElementById('mobile-fs-player');
+            fsPlayer.addEventListener('touchstart', e => {
+                if(!isDraggingProgress) startY = e.touches[0].clientY;
+            }, {passive: true});
+            fsPlayer.addEventListener('touchmove', e => {
+                if(isDraggingProgress) return;
+                const delta = e.touches[0].clientY - startY;
+                if(delta > 0) fsPlayer.style.transform = `translateY(${delta}px)`;
+            }, {passive: true});
+            fsPlayer.addEventListener('touchend', e => {
+                if(isDraggingProgress) return;
+                const delta = e.changedTouches[0].clientY - startY;
+                if(delta > 150) closeFSPlayer();
+                else fsPlayer.style.transform = '';
+            });
+        });
+
+        function formatTime(seconds) {
+            if (isNaN(seconds)) return "0:00";
+            const min = Math.floor(seconds / 60);
+            const sec = Math.floor(seconds % 60);
+            return `${min}:${sec.toString().padStart(2, '0')}`;
+        }
+
+        async function fetchSongsFromRepo() {
+            try {
+                // 1. Fetch Categories/Localhost
+                for (const cat of CATEGORIES) {
+                    const apiUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${BASE_PATH}/${cat}`;
+                    const response = await fetch(apiUrl);
+                    if (!response.ok) continue;
+                    const files = await response.json();
+                    const audioFiles = mapFilesToSongs(files, cat, GENRE_COVERS[cat]);
+                    if (audioFiles.length > 0) {
+                        library[cat] = audioFiles;
+                        audioFiles.forEach(s => { if (!allSongs.find(exist => exist.id === s.id)) allSongs.push(s); });
+                    }
+                }
+
+                // 2. Fetch Playlists (RenderX)
+                try {
+                    const rxUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${PLAYLIST_BASE}`;
+                    const rxResponse = await fetch(rxUrl);
+                    if (rxResponse.ok) {
+                        const rxDirs = await rxResponse.json();
+                        const playlists = rxDirs.filter(item => item.type === 'dir');
+                        for (const pl of playlists) {
+                            const plRes = await fetch(pl.url);
+                            if (!plRes.ok) continue;
+                            const plFiles = await plRes.json();
+                            const defaultPlCover = plFiles.find(f => f.name.match(/\.(jpg|jpeg|png|webp|gif)$/i));
+                            const audioFiles = mapFilesToSongs(plFiles, pl.name.replace(/%20/g, ' '), defaultPlCover?.download_url);
+                            if (audioFiles.length > 0) {
+                                library[`Playlist: ${pl.name.replace(/%20/g, ' ')}`] = audioFiles;
+                                audioFiles.forEach(s => { if (!allSongs.find(exist => exist.id === s.id)) allSongs.push(s); });
+                            }
+                        }
+                    }
+                } catch(e) {}
+
+                // 3. Fetch Albums (AlbumX Loader)
+                try {
+                    const albumUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${ALBUM_BASE}`;
+                    const albumRes = await fetch(albumUrl);
+                    if (albumRes.ok) {
+                        const albumDirs = await albumRes.json();
+                        const albums = albumDirs.filter(item => item.type === 'dir');
+                        for (const al of albums) {
+                            const alRes = await fetch(al.url);
+                            if (!alRes.ok) continue;
+                            const alFiles = await alRes.json();
+                            const defaultAlCover = alFiles.find(f => f.name.match(/\.(jpg|jpeg|png|webp|gif)$/i));
+                            const audioFiles = mapFilesToSongs(alFiles, al.name.replace(/%20/g, ' '), defaultAlCover?.download_url);
+                            if (audioFiles.length > 0) {
+                                library[`Album: ${al.name.replace(/%20/g, ' ')}`] = audioFiles;
+                                audioFiles.forEach(s => { if (!allSongs.find(exist => exist.id === s.id)) allSongs.push(s); });
+                            }
+                        }
+                    }
+                } catch(e) {}
+
+                switchTab('home');
+            } catch (err) {
+                console.error("Fetch Error:", err);
+            }
+        }
+
+        function mapFilesToSongs(files, defaultArtist, defaultCover) {
+            return files.filter(file => file.name.match(/\.(mp3|wav|mp4|m4a)$/i)).map(file => {
+                const fileName = file.name.replace(/\.[^/.]+$/, "");
+                const artworkFile = files.find(f => f.name.startsWith(fileName) && f.name.match(/\.(jpg|jpeg|png|webp|gif)$/i));
+                let title = fileName;
+                let artist = defaultArtist;
+                if (fileName.includes(" - ")) {
+                    const parts = fileName.split(" - ");
+                    artist = parts[0].trim();
+                    title = parts[1].trim();
+                }
+                return {
+                    id: file.sha,
+                    title: title.replace(/[_-]/g, " "),
+                    artist: artist.replace(/[_-]/g, " "),
+                    url: file.download_url,
+                    cover: artworkFile ? artworkFile.download_url : (defaultCover || GENRE_COVERS['Pop'] || GENRE_COVERS['Rock'])
+                };
+            });
+        }
+
+        function switchTab(tab) {
+            activeTab = tab;
+            
+            // Desktop active state
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.innerText.toLowerCase().includes(tab.toLowerCase()));
+            });
+
+            // Mobile active state mapping (updating icons and text color)
+            const mobileTabs = ['home', 'explore', 'albums', 'playlists'];
+            mobileTabs.forEach(t => {
+                const btn = document.getElementById(`mob-${t}`);
+                if(!btn) return;
+                const icon = btn.querySelector('i');
+                if (t === tab) {
+                    btn.classList.add('text-yt-accent');
+                    btn.classList.remove('text-yt-textMuted');
+                    icon.className = icon.className.replace('ph ', 'ph-fill ');
+                } else {
+                    btn.classList.remove('text-yt-accent');
+                    btn.classList.add('text-yt-textMuted');
+                    icon.className = icon.className.replace('ph-fill ', 'ph ');
+                }
+            });
+
+            renderView();
+            document.getElementById('main-scroll-area').scrollTop = 0;
+        }
+
+        function renderView() {
+            const container = elements.libraryContent;
+            container.innerHTML = '';
+            
+            let contentToRender = {};
+            let isExploreGrid = activeTab === 'explore';
+
+            if (activeTab === 'home') {
+                Object.keys(library).forEach(cat => {
+                    if (!cat.startsWith('Playlist: ') && !cat.startsWith('Album: ')) contentToRender[cat] = library[cat];
+                });
+            } else if (activeTab === 'explore') {
+                const shuffled = [...allSongs].sort(() => 0.5 - Math.random());
+                contentToRender['Fresh Finds'] = shuffled.slice(0, 24);
+            } else if (activeTab === 'playlists') {
+                Object.keys(library).forEach(cat => {
+                    if (cat.startsWith('Playlist: ')) contentToRender[cat.replace('Playlist: ', '')] = library[cat];
+                });
+                if (Object.keys(contentToRender).length === 0) {
+                    container.innerHTML = `<div class="py-20 text-center text-yt-textMuted">No playlists found.</div>`;
+                    return;
+                }
+            } else if (activeTab === 'albums') {
+                Object.keys(library).forEach(cat => {
+                    if (cat.startsWith('Album: ')) contentToRender[cat.replace('Album: ', '')] = library[cat];
+                });
+                if (Object.keys(contentToRender).length === 0) {
+                    container.innerHTML = `<div class="py-20 text-center text-yt-textMuted">No albums synced yet.</div>`;
+                    return;
+                }
+            } else if (activeTab === 'liked') {
+                const likedTracks = allSongs.filter(s => userLikes.liked.includes(s.id));
+                if (likedTracks.length === 0) {
+                    container.innerHTML = `<div class="py-20 text-center text-yt-textMuted">No liked songs yet.</div>`;
+                    return;
+                }
+                contentToRender['Favorites'] = likedTracks;
+            }
+
+            for (const [category, songs] of Object.entries(contentToRender)) {
+                const safeId = category.replace(/[^a-zA-Z0-9]/g, '');
+                const section = document.createElement('div');
+                section.className = 'mb-10';
+                
+                const listClass = isExploreGrid 
+                    ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 md:gap-6 px-2 pb-4'
+                    : 'flex overflow-x-auto hide-scrollbar gap-5 px-2 pb-4';
+
+                section.innerHTML = `
+                    <div class="px-2 mb-4 flex items-center justify-between">
+                        <h2 class="text-xl md:text-2xl font-bold tracking-tight">${category}</h2>
+                    </div>
+                    <div class="${listClass}" id="row-${safeId}"></div>
+                `;
+                container.appendChild(section);
+
+                const row = document.getElementById(`row-${safeId}`);
+                songs.forEach(song => {
+                    const card = document.createElement('div');
+                    card.className = isExploreGrid 
+                        ? 'cursor-pointer group' 
+                        : 'flex-none w-36 md:w-48 cursor-pointer group';
+                    
+                    card.onclick = () => {
+                        currentPlaylist = [...songs];
+                        currentIndex = currentPlaylist.findIndex(s => s.id === song.id);
+                        playTrack(song);
+                    };
+                    card.innerHTML = `
+                        <div class="relative aspect-square mb-3 rounded-xl overflow-hidden bg-yt-surface album-art-container shadow-lg">
+                            <img src="${song.cover}" class="w-full h-full object-cover group-hover:scale-105 transition duration-500" loading="lazy">
+                            <div class="play-overlay absolute inset-0 flex items-center justify-center">
+                                <div class="w-10 h-10 md:w-12 md:h-12 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center shadow-2xl">
+                                    <i class="ph-fill ph-play text-white text-xl flex items-center justify-center ml-1"></i>
+                                </div>
+                            </div>
+                        </div>
+                        <h3 class="font-semibold text-xs md:text-sm truncate pr-2">${song.title}</h3>
+                        <p class="text-[10px] md:text-xs text-yt-textMuted truncate">${song.artist}</p>
+                    `;
+                    row.appendChild(card);
+                });
+            }
+        }
+
+        async function playTrack(song) {
+            elements.progressBar.style.width = '0%';
+            document.getElementById('fs-progress').style.width = '0%';
+            elements.timeCurrent.textContent = "0:00";
+            document.getElementById('fs-time-current').textContent = "0:00";
+            
+            elements.audio.pause();
+            elements.audio.src = song.url;
+            elements.audio.load();
+
+            try {
+                await elements.audio.play();
+                setPlayState(true);
+            } catch (e) {
+                if (e.name !== "AbortError") console.error(e);
+            }
+
+            // Update Normal Player
+            elements.playerTitle.textContent = song.title;
+            elements.playerArtist.textContent = song.artist;
+            elements.playerArt.src = song.cover;
+            elements.playerArt.classList.remove('hidden');
+            elements.playerPlaceholder.classList.add('hidden');
+
+            // Update FS Player
+            document.getElementById('fs-title').textContent = song.title;
+            document.getElementById('fs-artist').textContent = song.artist;
+            document.getElementById('fs-art').src = song.cover;
+            document.getElementById('fs-art').classList.remove('hidden');
+            document.getElementById('fs-placeholder').classList.add('hidden');
+
+            updateLikeUI(song.id);
+        }
+
+        function togglePlay() {
+            if (!elements.audio.src) return;
+            if (isPlaying) {
+                elements.audio.pause();
+                setPlayState(false);
+            } else {
+                elements.audio.play().catch(e => {
+                    if (e.name !== "AbortError") console.error(e);
+                });
+                setPlayState(true);
+            }
+        }
+
+        function playNext() {
+            if (currentPlaylist.length > 0 && currentIndex < currentPlaylist.length - 1) {
+                currentIndex++;
+                playTrack(currentPlaylist[currentIndex]);
+            } else if (repeatState === 1 && currentPlaylist.length > 0) {
+                // Loop back if Repeat All is active
+                currentIndex = 0;
+                playTrack(currentPlaylist[0]);
+            }
+        }
+
+        function playPrev() {
+            if (currentPlaylist.length > 0 && currentIndex > 0) {
+                currentIndex--;
+                playTrack(currentPlaylist[currentIndex]);
+            }
+        }
+
+        function toggleRepeat() {
+            repeatState = (repeatState + 1) % 3;
+            const normBtn = document.getElementById('btn-repeat');
+            const fsBtn = document.getElementById('fs-btn-repeat');
+            const normIcon = document.getElementById('repeat-icon');
+            const fsIcon = document.getElementById('fs-repeat-icon');
+
+            [normBtn, fsBtn].forEach(btn => {
+                if(repeatState === 0) {
+                    btn.classList.remove('text-yt-accent');
+                    btn.classList.add('text-yt-textMuted');
+                } else {
+                    btn.classList.add('text-yt-accent');
+                    btn.classList.remove('text-yt-textMuted');
+                }
+            });
+
+            [normIcon, fsIcon].forEach(icon => {
+                if(repeatState === 0 || repeatState === 1) {
+                    icon.className = icon.className.replace('ph-repeat-once', 'ph-repeat');
+                } else if (repeatState === 2) {
+                    icon.className = icon.className.replace('ph-repeat', 'ph-repeat-once');
+                }
+            });
+        }
+
+        function handleVote(type) {
+            if (currentIndex === -1 || !currentPlaylist[currentIndex]) return;
+            const song = currentPlaylist[currentIndex];
+            const target = type === 'like' ? 'liked' : 'disliked';
+            const opposite = type === 'like' ? 'disliked' : 'liked';
+            
+            if (userLikes[target].includes(song.id)) {
+                userLikes[target] = userLikes[target].filter(id => id !== song.id);
+            } else {
+                userLikes[target].push(song.id);
+                userLikes[opposite] = userLikes[opposite].filter(id => id !== song.id);
+            }
+            
+            setCookie('trickster_likes', userLikes);
+            updateLikeUI(song.id);
+            
+            if (activeTab === 'liked') renderView();
+        }
+
+        function updateLikeUI(songId) {
+            const isLiked = userLikes.liked.includes(songId);
+            const isDisliked = userLikes.disliked.includes(songId);
+
+            // Normal Player
+            if (elements.btnLike && elements.btnDislike) {
+                elements.btnLike.className = isLiked ? "text-yt-accent transition scale-110" : "text-yt-textMuted hover:text-white transition";
+                elements.btnLike.innerHTML = isLiked ? '<i class="ph-fill ph-thumbs-up text-xl"></i>' : '<i class="ph ph-thumbs-up text-xl"></i>';
+                elements.btnDislike.className = isDisliked ? "text-white transition scale-110" : "text-yt-textMuted hover:text-white transition";
+                elements.btnDislike.innerHTML = isDisliked ? '<i class="ph-fill ph-thumbs-down text-xl"></i>' : '<i class="ph ph-thumbs-down text-xl"></i>';
+            }
+
+            // FS Player
+            const fsBtnLike = document.getElementById('fs-btn-like');
+            const fsBtnDislike = document.getElementById('fs-btn-dislike');
+            if (fsBtnLike && fsBtnDislike) {
+                fsBtnLike.className = isLiked ? "text-yt-accent transition scale-110" : "text-yt-textMuted hover:text-white transition";
+                fsBtnLike.innerHTML = isLiked ? '<i class="ph-fill ph-thumbs-up text-2xl"></i>' : '<i class="ph ph-thumbs-up text-2xl"></i>';
+                fsBtnDislike.className = isDisliked ? "text-white transition scale-110" : "text-yt-textMuted hover:text-white transition";
+                fsBtnDislike.innerHTML = isDisliked ? '<i class="ph-fill ph-thumbs-down text-2xl"></i>' : '<i class="ph ph-thumbs-down text-2xl"></i>';
+            }
+        }
+
+        function setPlayState(playing) {
+            isPlaying = playing;
+            elements.playIcon.className = isPlaying ? "ph-fill ph-pause text-xl md:text-2xl" : "ph-fill ph-play text-xl md:text-2xl";
+            
+            const fsPlayIcon = document.getElementById('fs-play-icon');
+            if(fsPlayIcon) {
+                fsPlayIcon.className = isPlaying ? "ph-fill ph-pause text-4xl ml-0" : "ph-fill ph-play text-4xl ml-1";
+            }
+        }
+
+        function openFSPlayer() {
+            const fsPlayer = document.getElementById('mobile-fs-player');
+            fsPlayer.classList.remove('translate-y-full');
+            fsPlayer.style.transform = '';
+        }
+
+        function closeFSPlayer() {
+            const fsPlayer = document.getElementById('mobile-fs-player');
+            fsPlayer.style.transform = '';
+            fsPlayer.classList.add('translate-y-full');
+        }
+
+        function enterApp() {
+            elements.loginScreen.classList.add('opacity-0', '-translate-y-4');
+            setTimeout(() => {
+                elements.loginScreen.style.display = 'none';
+                elements.mainApp.classList.remove('hidden');
+                setTimeout(() => {
+                    elements.mainApp.classList.remove('opacity-0', 'translate-y-4');
+                    fetchSongsFromRepo();
+                }, 50);
+            }, 500);
+        }
+    </script>
+</body>
+</html>
